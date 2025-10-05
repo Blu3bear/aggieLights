@@ -14,47 +14,52 @@ It seeks to implement the same base functionality but with modified states for t
 #define RUNNING 3         // The state value corresponding to blue running up
 #define CUSTOM 4          // The state value corresponding to a custom color map(WIP) 
 
-///Adafruit_NeoPixel NeoPixel(NUM_PIXELS, PIN_NEO_PIXEL, NEO_WRGB + NEO_KHZ800);
 
+// The lights get activated by driving the pins low, but the driver I have for power requirements inverts the signal
 uint32_t BLUE[3] = {40, 141, 194};
 uint32_t WHITE[3] ={255,255,255};
 
+// state variable, and counter initialization
 uint8_t state = 0;
 uint8_t debounce = 0;
-///uint32_t map[NUM_PIXELS] = {}
+uint16_t running_cnt = 0;
 
 void setup() {
-  //NeoPixel.begin();  // initialize NeoPixel strip
+  // Initialize the state variable
   state = 0;
   debounce = 0;
+  running_cnt = 0;
   pinMode(BTN_PIN, INPUT);
-
 }
 
 void loop() {
   // Check the state, then run the appropriate
   switch (state) {
   case SOLID_WHITE:
-    // we light the leds by driving the signal low so we need to invert the output
     lightWhite();
   break;
   case SOLID_BLUE:
-    // Light the lights blue
     lightBlue();
   break;
   case ALTERNATING:
     // Alternate white and blue
-    //for the strip im using the best I can do is light blue and every other one will activate ):
+    // for the strip im using the best I can do is light blue and every other one will activate ):
     analogWrite(R_PIN, 0);
     analogWrite(G_PIN, 0);
     analogWrite(B_PIN, BLUE[2]);
   break;
   case RUNNING:
     // running light effect
+    if(running_cnt < 200){
     lightWhite();
-    delay(100);
+    delay(1);
+    running_cnt++;
+    }
+    else{
     lightBlue();
-    delay(100);
+    delay(1);
+    running_cnt = (running_cnt+1)%400;
+    }
   break;
   default:
     // default to lights off
