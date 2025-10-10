@@ -62,16 +62,117 @@ void setup() {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>RGB Light Control</title>
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <title>RGB Control</title>
+      <style>
+      body{font-family:Arial;max-width:400px;margin:50px auto;padding:20px;background:#222;color:#fff}
+      h1{text-align:center;font-size:24px;margin:0 0 20px}
+      .mode{text-align:center;margin-bottom:20px}
+      .mode label{display:inline;margin:0 10px;font-weight:normal;cursor:pointer}
+      .slider{width:100%;margin:15px 0}
+      input[type=range]{width:100%;height:30px;-webkit-appearance:none;background:transparent}
+      input[type=range]::-webkit-slider-track{height:8px;background:#555;border-radius:4px}
+      input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;cursor:pointer}
+      input[type=range]::-moz-range-track{height:8px;background:#555;border-radius:4px}
+      input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;border:0;cursor:pointer}
+      #r::-webkit-slider-thumb,#r2::-webkit-slider-thumb{background:#f00}
+      #r::-moz-range-thumb,#r2::-moz-range-thumb{background:#f00}
+      #g::-webkit-slider-thumb,#g2::-webkit-slider-thumb{background:#0f0}
+      #g::-moz-range-thumb,#g2::-moz-range-thumb{background:#0f0}
+      #b::-webkit-slider-thumb,#b2::-webkit-slider-thumb{background:#00f}
+      #b::-moz-range-thumb,#b2::-moz-range-thumb{background:#00f}
+      label{display:flex;justify-content:space-between;margin-bottom:5px;font-weight:bold}
+      .val{background:#333;border:1px solid #555;border-radius:4px;padding:2px 6px;color:#fff;width:35px;text-align:center}
+      input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+      input[type=number]{-moz-appearance:textfield}
+      #preview{height:60px;border-radius:8px;margin:20px 0;transition:background .1s}
+      #preview2{height:60px;border-radius:8px;margin:20px 0;transition:background .1s;display:none}
+      #c2{display:none}
+      button{width:100%;padding:12px;font-size:16px;background:#0066cc;color:#fff;border:0;border-radius:6px;cursor:pointer;margin-top:10px}
+      button:active{background:#0052a3}
+      </style>
       </head>
       <body>
-        <h1>Set Custom RGB Values</h1>
-        <form action="/setRGB" method="POST">
-          R: <input type="number" name="r" min="0" max="255"><br>
-          G: <input type="number" name="g" min="0" max="255"><br>
-          B: <input type="number" name="b" min="0" max="255"><br>
-          <input type="submit" value="Set">
-        </form>
+      <h1>RGB Light Control</h1>
+      <div class="mode">
+      <label><input type="radio" name="m" value="0" checked onchange="m()"> Single</label>
+      <label><input type="radio" name="m" value="1" onchange="m()"> Transition</label>
+      </div>
+      <div id="preview"></div>
+      <div id="c1">
+      <div class="slider">
+      <label>R: <input type="number" class="val" id="rv" min="0" max="255" value="0" onchange="v('r',this.value)"></label>
+      <input type="range" id="r" min="0" max="255" value="0" oninput="u()">
+      </div>
+      <div class="slider">
+      <label>G: <input type="number" class="val" id="gv" min="0" max="255" value="0" onchange="v('g',this.value)"></label>
+      <input type="range" id="g" min="0" max="255" value="0" oninput="u()">
+      </div>
+      <div class="slider">
+      <label>B: <input type="number" class="val" id="bv" min="0" max="255" value="0" onchange="v('b',this.value)"></label>
+      <input type="range" id="b" min="0" max="255" value="0" oninput="u()">
+      </div>
+      </div>
+      <div id="c2">
+      <div id="preview2"></div>
+      <div class="slider">
+      <label>R2: <input type="number" class="val" id="r2v" min="0" max="255" value="0" onchange="v('r2',this.value)"></label>
+      <input type="range" id="r2" min="0" max="255" value="0" oninput="u2()">
+      </div>
+      <div class="slider">
+      <label>G2: <input type="number" class="val" id="g2v" min="0" max="255" value="0" onchange="v('g2',this.value)"></label>
+      <input type="range" id="g2" min="0" max="255" value="0" oninput="u2()">
+      </div>
+      <div class="slider">
+      <label>B2: <input type="number" class="val" id="b2v" min="0" max="255" value="0" onchange="v('b2',this.value)"></label>
+      <input type="range" id="b2" min="0" max="255" value="0" oninput="u2()">
+      </div>
+      </div>
+      <button onclick="s()">Set Color</button>
+      <script>
+      function u(){
+      let r=document.getElementById('r').value;
+      let g=document.getElementById('g').value;
+      let b=document.getElementById('b').value;
+      document.getElementById('rv').value=r;
+      document.getElementById('gv').value=g;
+      document.getElementById('bv').value=b;
+      document.getElementById('preview').style.background='rgb('+r+','+g+','+b+')';
+      }
+      function u2(){
+      let r2=document.getElementById('r2').value;
+      let g2=document.getElementById('g2').value;
+      let b2=document.getElementById('b2').value;
+      document.getElementById('r2v').value=r2;
+      document.getElementById('g2v').value=g2;
+      document.getElementById('b2v').value=b2;
+      document.getElementById('preview2').style.background='rgb('+r2+','+g2+','+b2+')';
+      }
+      function v(id,val){
+      document.getElementById(id).value=val;
+      if(id.includes('2'))u2();else u();
+      }
+      function m(){
+      let mode=document.querySelector('input[name="m"]:checked').value;
+      document.getElementById('c2').style.display=mode=='1'?'block':'none';
+      document.getElementById('preview2').style.display=mode=='1'?'block':'none';
+      }
+      function s(){
+      let mode=document.querySelector('input[name="m"]:checked').value;
+      let r=document.getElementById('r').value;
+      let g=document.getElementById('g').value;
+      let b=document.getElementById('b').value;
+      let body='r='+r+'&g='+g+'&b='+b+'&m='+mode;
+      if(mode=='1'){
+      let r2=document.getElementById('r2').value;
+      let g2=document.getElementById('g2').value;
+      let b2=document.getElementById('b2').value;
+      body+='&r2='+r2+'&g2='+g2+'&b2='+b2;
+      }
+      fetch('/setRGB',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body});
+      }
+      u();
+      </script>
       </body>
       </html>
     )rawliteral");
