@@ -13,3 +13,6 @@ There are currently two source code files in the repo
   - this file was a way to test some functionality using pwm based non-addressable led strip, while waiting for addressable led strip
 - aggieLights.ino
   - This is the main sketch file, will be the one compiled and loaded onto the uC.
+## Collaboration
+
+Prs welcome, small changes should be fine to just push directly for those who have permissions but if changes are extensive please make a branch to be reviewed.
