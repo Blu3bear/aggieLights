@@ -1,6 +1,8 @@
 #include <Adafruit_NeoPixel.h>
 #include <math.h>
 #include <Preferences.h>
+#include <WiFi.h>
+#include <ESPAsyncWebServer.h>
 
 #define BTN_PIN 27
 #define PIN_NEO_PIXEL 14 // The ESP32 pin GPIO16 connected to NeoPixel
@@ -12,7 +14,14 @@
 #define RUNNING 4        // The state value corresponding to blue running up
 #define CUSTOM 5         // The state value corresponding to a custom color map(WIP)
 
+// Library objects
 Adafruit_NeoPixel NeoPixel(NUM_PIXELS, PIN_NEO_PIXEL, NEO_GRBW + NEO_KHZ800);
+Preferences preferences;
+AsyncWebServer server(80);
+
+// WiFi credentials
+const char* ssid = "Aggie_Light";
+const char* password = "usu1888";
 
 uint32_t BLUE = NeoPixel.Color(1, 173, 216, 0);
 uint32_t WHITE = NeoPixel.Color(0, 0, 0, 255);
@@ -23,13 +32,27 @@ uint16_t running_cnt = 0;
 uint32_t base_color;
 uint32_t sec_color;
 
+// Button timing variables
+unsigned long press_start = 0;
+bool button_handled = false;
+bool web_server_enabled = false;
+const unsigned long LONG_PRESS_MS = 3000;
+const uint8_t DEBOUNCE_THRESHOLD = 50;
+
 // Function prototype
 uint32_t rgbw_lin_interp(uint32_t c1, uint32_t c2, uint32_t steps = 255);
 
 void setup()
 {
   pinMode(BTN_PIN, INPUT);
-  NeoPixel.begin(); // initialize NeoPixel strip
+  NeoPixel.begin();                   // initialize NeoPixel strip
+  preferences.begin("colors", false); // initialize preferences
+    // Initialize WiFi in access point mode
+  WiFi.softAP(ssid, password);
+  Serial.begin(115200);
+  
+  base_color = preferences.getUInt("base", WHITE);
+  sec_color = preferences.getUInt("sec", BLUE);
   state = 0;
 }
 
@@ -47,23 +70,30 @@ void loop()
     break;
   case SOLID_WHITE:
     // Use the neopixel fill function to set all white(color is in the form 0xggrrbbww)
-    NeoPixel.fill(WHITE);
+    NeoPixel.fill(base_color);
     break;
   case SOLID_BLUE:
     // Fill with electric blue(pulled from the usu brand toolkit)
-    NeoPixel.fill(BLUE);
+    NeoPixel.fill(sec_color);
     break;
   case ALTERNATING:
     // Use the sine8 function to give a smooth transition between two colors
     steps = NeoPixel.sine8(running_cnt % 256);
-    color = WHITE + rgbw_lin_interp(WHITE, BLUE) * steps;
+    if (base_color < sec_color)
+    {
+      color = base_color + rgbw_lin_interp(base_color, sec_color) * steps;
+    }
+    else
+    {
+      color = sec_color + rgbw_lin_interp(sec_color, base_color) * steps;
+    }
     NeoPixel.fill(color);
     break;
   case RUNNING:
     // Fill the whole strip white
-    NeoPixel.fill(0x000000ff);
+    NeoPixel.fill(base_color);
     // Set a single blue pixel to blue to create a running effect.
-    NeoPixel.setPixelColor((running_cnt / 127) % NUM_PIXELS, 0xAD01D800);
+    NeoPixel.setPixelColor((running_cnt / 127) % NUM_PIXELS, sec_color);
     break;
   default:
     // fill with red if something went wrong.
@@ -84,20 +114,47 @@ void loop()
 
   if (btn_val == HIGH)
   {
-    if (debounce < 255)
+    if (debounce < DEBOUNCE_THRESHOLD)
     {
       debounce++;
     }
+    else if (press_start == 0)
+    {
+      // Button just became stable HIGH, record start time
+      press_start = millis();
+      button_handled = false;
+    }
+    else if (!button_handled && (millis() - press_start >= LONG_PRESS_MS))
+    {
+      // Long press detected while still holding
+      button_handled = true;
+      web_server_enabled = !web_server_enabled;
+
+      // Flash yellow to indicate toggle
+      for (int i = 0; i < 3; i++)
+      {
+        NeoPixel.fill(NeoPixel.Color(255, 255, 0, 0)); // Yellow
+        NeoPixel.show();
+        delay(200);
+        NeoPixel.clear();
+        NeoPixel.show();
+        delay(200);
+      }
+    }
   }
-  else if (btn_val == LOW && debounce > 1)
+  else if (btn_val == LOW && press_start > 0)
   {
+    // Button released
+    if (!button_handled && debounce >= DEBOUNCE_THRESHOLD)
+    {
+      // Short press - advance state
+      running_cnt = 0;
+      state = (state + 1) % 5;
+    }
+    // Reset for next press
     debounce = 0;
-    running_cnt = 0;
-    state = (state + 1) % 6;
-  }
-  else
-  {
-    debounce = 0;
+    press_start = 0;
+    button_handled = false;
   }
 }
 
