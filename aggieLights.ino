@@ -32,6 +32,7 @@ uint16_t running_cnt = 0;
 uint32_t base_color;
 uint32_t sec_color;
 uint8_t brightness;
+uint8_t speed;
 
 // Button timing variables
 unsigned long press_start = 0;
@@ -134,6 +135,14 @@ button:active{background:#1a7ab0}
 </div>
 </div>
 
+<div class="section">
+<h2>Animation Speed</h2>
+<div class="slider">
+<label>Speed: <input type="number" class="val" id="spv" min="1" max="255" value="127" onchange="document.getElementById('sp').value=this.value"></label>
+<input type="range" class="g" id="sp" min="1" max="255" value="127" oninput="document.getElementById('spv').value=this.value">
+</div>
+</div>
+
 <button onclick="s()">Save Settings</button>
 
 <script>
@@ -165,7 +174,8 @@ let g2=document.getElementById('g2').value;
 let b2=document.getElementById('b2').value;
 let w2=document.getElementById('w2').value;
 let br=document.getElementById('br').value;
-let body='r1='+r1+'&g1='+g1+'&b1='+b1+'&w1='+w1+'&r2='+r2+'&g2='+g2+'&b2='+b2+'&w2='+w2+'&br='+br;
+let sp=document.getElementById('sp').value;
+let body='r1='+r1+'&g1='+g1+'&b1='+b1+'&w1='+w1+'&r2='+r2+'&g2='+g2+'&b2='+b2+'&w2='+w2+'&br='+br+'&sp='+sp;
 fetch('/setColors',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
 .then(r=>r.text()).then(t=>alert(t));
 }
@@ -185,6 +195,7 @@ void setup()
   base_color = preferences.getUInt("base", WHITE);
   sec_color = preferences.getUInt("sec", BLUE);
   brightness = preferences.getUChar("bright", 255);
+  speed = preferences.getUChar("speed",127);
   NeoPixel.setBrightness(brightness);
 
   // Setup server routes (but don't start yet)
@@ -206,7 +217,7 @@ void setupServerRoutes()
         request->hasParam("b1", true) && request->hasParam("w1", true) &&
         request->hasParam("r2", true) && request->hasParam("g2", true) && 
         request->hasParam("b2", true) && request->hasParam("w2", true) &&
-        request->hasParam("br", true)) {
+        request->hasParam("br", true) && request->hasParam("sp", true)) {
       
       // Get base color values
       uint8_t r1 = request->getParam("r1", true)->value().toInt();
@@ -220,8 +231,9 @@ void setupServerRoutes()
       uint8_t b2 = request->getParam("b2", true)->value().toInt();
       uint8_t w2 = request->getParam("w2", true)->value().toInt();
       
-      // Get brightness
+      // Get brightness and speed
       brightness = request->getParam("br", true)->value().toInt();
+      speed = request->getParam("sp", true)->value().toInt();
       
       // Update colors using NeoPixel.Color() - note: Color(r,g,b,w)
       base_color = NeoPixel.Color(r1, g1, b1, w1);
@@ -232,6 +244,7 @@ void setupServerRoutes()
       preferences.putUInt("base", base_color);
       preferences.putUInt("sec", sec_color);
       preferences.putUChar("bright", brightness);
+      preferences.putUChar("speed", speed);
       
       request->send(200, "text/plain", "Colors saved successfully!");
     } else {
@@ -282,6 +295,8 @@ void loop()
     steps = NeoPixel.sine8(running_cnt % 256);
     color = rgbw_lin_interp(base_color, sec_color, steps);
     NeoPixel.fill(color);
+    // Add delay based on speed: speed=1 is slowest (~500ms), speed=255 is fastest (~2ms)
+    delay((256 - speed) * 2);
     break;
   case RUNNING:
     // Fill the whole strip white
@@ -400,10 +415,10 @@ uint32_t rgbw_lin_interp(uint32_t c1, uint32_t c2, uint32_t step, uint32_t num_s
   dif_b = (c2 & 0xff) - (c1 & 0xff);
 
   // get each new color value
-  new_w = (uint16_t)((c1 & 0xff000000) >> 24) + (dif_w * step)/num_steps;
-  new_r = (uint16_t)((c1 & 0xff0000) >> 16) + (dif_r * step)/num_steps;
-  new_g = (uint16_t)((c1 & 0xff00) >> 8) + (dif_g * step)/num_steps;
-  new_b = (uint16_t)(c1 & 0xff) + (dif_b * step)/num_steps;
+  new_w = (uint16_t)((c1 & 0xff000000) >> 24) + (dif_w * step) / num_steps;
+  new_r = (uint16_t)((c1 & 0xff0000) >> 16) + (dif_r * step) / num_steps;
+  new_g = (uint16_t)((c1 & 0xff00) >> 8) + (dif_g * step) / num_steps;
+  new_b = (uint16_t)(c1 & 0xff) + (dif_b * step) / num_steps;
 
   // repack to new color with gamma correction for perceptually smooth transitions
   uint32_t new_color = ((uint32_t)NeoPixel.gamma8(new_w) << 24) |
