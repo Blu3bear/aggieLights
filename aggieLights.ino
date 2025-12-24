@@ -36,6 +36,7 @@ uint8_t speed;
 
 // Button timing variables
 unsigned long press_start = 0;
+unsigned long last_step_time = 0;
 bool button_handled = false;
 bool web_server_enabled = false;
 const unsigned long LONG_PRESS_MS = 3000;
@@ -138,7 +139,7 @@ button:active{background:#1a7ab0}
 <div class="section">
 <h2>Animation Speed</h2>
 <div class="slider">
-<label>Speed: <input type="number" class="val" id="spv" min="1" max="255" value="127" onchange="document.getElementById('sp').value=this.value"></label>
+<label>Speed: <input type="number" class="val" id="spv" min="0" max="255" value="127" onchange="document.getElementById('sp').value=this.value"></label>
 <input type="range" class="g" id="sp" min="1" max="255" value="127" oninput="document.getElementById('spv').value=this.value">
 </div>
 </div>
@@ -295,8 +296,6 @@ void loop()
     steps = NeoPixel.sine8(running_cnt % 256);
     color = rgbw_lin_interp(base_color, sec_color, steps);
     NeoPixel.fill(color);
-    // Add delay based on speed: speed=1 is slowest (~500ms), speed=255 is fastest (~2ms)
-    delay((256 - speed) * 2);
     break;
   case RUNNING:
     // Fill the whole strip white
@@ -315,11 +314,18 @@ void loop()
   }
   NeoPixel.show();
 
-  running_cnt++;
-  // don't let running_cnt overflow
-  if (running_cnt == 0xffff)
+  // Update animation counter based on speed (non-blocking)
+  // speed=1 -> ~510ms per step, speed=255 -> ~2ms per step
+  unsigned long step_interval = (255 - speed) * 2;
+  if (millis() - last_step_time >= step_interval)
   {
-    running_cnt = 0;
+    last_step_time = millis();
+    running_cnt++;
+    // don't let running_cnt overflow
+    if (running_cnt == 0xffff)
+    {
+      running_cnt = 0;
+    }
   }
 
   // Debounce button press and increment the state
