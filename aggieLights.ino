@@ -12,7 +12,8 @@
 #define SOLID_BLUE 2     // The state value corresponding to solid blue
 #define ALTERNATING 3    // The state value corresponding to alternating blue/white
 #define RUNNING 4        // The state value corresponding to blue running up
-#define CUSTOM 5         // The state value corresponding to a custom color map(WIP)
+#define RAINBOW 5        // Rainbow state
+#define CUSTOM 6         // The state value corresponding to a custom color map(WIP)
 
 // Library objects
 Adafruit_NeoPixel NeoPixel(NUM_PIXELS, PIN_NEO_PIXEL, NEO_GRBW + NEO_KHZ800);
@@ -20,7 +21,7 @@ Preferences preferences;
 AsyncWebServer server(80);
 
 // WiFi credentials
-const char* ssid = "Aggie_Light";
+const char *ssid = "Aggie_Light";
 
 uint32_t BLUE = NeoPixel.Color(1, 173, 216, 0);
 uint32_t WHITE = NeoPixel.Color(0, 0, 0, 255);
@@ -39,7 +40,7 @@ const unsigned long LONG_PRESS_MS = 3000;
 const uint8_t DEBOUNCE_THRESHOLD = 50;
 
 // Function prototypes
-uint32_t rgbw_lin_interp(uint32_t c1, uint32_t c2, uint32_t steps = 255);
+uint32_t rgbw_lin_interp(uint32_t c1, uint32_t c2, uint32_t step, uint32_t num_steps = 255);
 void setupServerRoutes();
 void startServer();
 void stopServer();
@@ -169,26 +170,26 @@ void setup()
   pinMode(BTN_PIN, INPUT);
   NeoPixel.begin();                   // initialize NeoPixel strip
   preferences.begin("colors", false); // initialize preferences
-  
+
   // Load saved colors from preferences
   base_color = preferences.getUInt("base", WHITE);
   sec_color = preferences.getUInt("sec", BLUE);
-  
+
   // Setup server routes (but don't start yet)
   setupServerRoutes();
-  
+
   state = 0;
 }
 
 void setupServerRoutes()
 {
   // Serve the webpage for RGBW input
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send_P(200, "text/html", index_html);
-  });
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->send_P(200, "text/html", index_html); });
 
   // Handle color POST request
-  server.on("/setColors", HTTP_POST, [](AsyncWebServerRequest *request){
+  server.on("/setColors", HTTP_POST, [](AsyncWebServerRequest *request)
+            {
     if (request->hasParam("r1", true) && request->hasParam("g1", true) && 
         request->hasParam("b1", true) && request->hasParam("w1", true) &&
         request->hasParam("r2", true) && request->hasParam("g2", true) && 
@@ -217,15 +218,14 @@ void setupServerRoutes()
       request->send(200, "text/plain", "Colors saved successfully!");
     } else {
       request->send(400, "text/plain", "Invalid color values");
-    }
-  });
+    } });
 }
 
 void startServer()
 {
   // Start open AP (no password)
   WiFi.softAP(ssid);
-  
+
   // Start web server
   server.begin();
 }
@@ -234,7 +234,7 @@ void stopServer()
 {
   // Stop web server
   server.end();
-  
+
   // Stop AP
   WiFi.softAPdisconnect(true);
 }
@@ -262,14 +262,7 @@ void loop()
   case ALTERNATING:
     // Use the sine8 function to give a smooth transition between two colors
     steps = NeoPixel.sine8(running_cnt % 256);
-    if (base_color < sec_color)
-    {
-      color = base_color + rgbw_lin_interp(base_color, sec_color) * steps;
-    }
-    else
-    {
-      color = sec_color + rgbw_lin_interp(sec_color, base_color) * steps;
-    }
+    color = rgbw_lin_interp(base_color, sec_color, steps);
     NeoPixel.fill(color);
     break;
   case RUNNING:
@@ -277,6 +270,10 @@ void loop()
     NeoPixel.fill(base_color);
     // Set a single blue pixel to blue to create a running effect.
     NeoPixel.setPixelColor((running_cnt / 127) % NUM_PIXELS, sec_color);
+    break;
+  case RAINBOW:
+    // Fill with rainbow
+    NeoPixel.rainbow(running_cnt);
     break;
   default:
     // fill with red if something went wrong.
@@ -295,7 +292,7 @@ void loop()
   // Debounce button press and increment the state
   int btn_val = digitalRead(BTN_PIN);
 
-  if (btn_val == HIGH)
+  if (btn_val == LOW)
   {
     if (debounce < DEBOUNCE_THRESHOLD)
     {
@@ -343,14 +340,14 @@ void loop()
       }
     }
   }
-  else if (btn_val == LOW && press_start > 0)
+  else if (btn_val == HIGH && press_start > 0)
   {
     // Button released
     if (!button_handled && debounce >= DEBOUNCE_THRESHOLD)
     {
       // Short press - advance state
       running_cnt = 0;
-      state = (state + 1) % 5;
+      state = (state + 1) % 6;
     }
     // Reset for next press
     debounce = 0;
@@ -359,36 +356,39 @@ void loop()
   }
 }
 
-uint32_t rgbw_lin_interp(uint32_t c1, uint32_t c2, uint32_t steps)
+uint32_t rgbw_lin_interp(uint32_t c1, uint32_t c2, uint32_t step, uint32_t num_steps)
 {
   // linear interpolation for rgbw values
   // arguments:
   //    c1 - a packed color code in the form 0xgrbw
   //    c2 - a second packed color code
+  //    step - the current step between c1 and c2
   //    steps - the number of steps between c1 and c2(default 255)
   // returns:
-  //    uint32_t representing the offset to go from the higher of the two to the other in steps
-  uint32_t dif = 0;
-  uint32_t begin, end;
-  if (c1 < c2)
-  {
-    begin = c1;
-    end = c2;
-  }
-  else
-  {
-    begin = c2;
-    end = c1;
-  }
+  //    uint32_t representing the current value that is %step% steps from c1 to c2
 
-  // dif_1 = begin;
+  int16_t dif_r, dif_g, dif_b, dif_w;
+  uint8_t new_r, new_g, new_b, new_w;
+  // most significant byte is white
+  dif_w = ((c2 & 0xff000000) >> 24) - ((c1 & 0xff000000) >> 24);
 
-  // TODO: extract from difference in w from c1 and c2
-  //        extract the difference in r from c1 and c2
-  //        extract the difference in g from c1 and c2
-  //        extract the difference in b from c1 and c2
+  // then red
+  dif_r = ((c2 & 0xff0000) >> 16) - ((c1 & 0xff0000) >> 16);
 
-  // TODO: repack the differnces as a single value
+  // then green
+  dif_g = ((c2 & 0xff00) >> 8) - ((c1 & 0xff00) >> 8);
 
-  return dif;
+  // then blue
+  dif_b = (c2 & 0xff) - (c1 & 0xff);
+
+  // get each new color value
+  new_w = (uint16_t)((c1 & 0xff000000) >> 24) + (dif_w * step)/num_steps;
+  new_r = (uint16_t)((c1 & 0xff0000) >> 16) + (dif_r * step)/num_steps;
+  new_g = (uint16_t)((c1 & 0xff00) >> 8) + (dif_g * step)/num_steps;
+  new_b = (uint16_t)(c1 & 0xff) + (dif_b * step)/num_steps;
+
+  // repack to new color
+  uint32_t new_color = 0x0 | new_w << 24 | new_r << 16 | new_g << 8 | new_b;
+
+  return new_color;
 }
