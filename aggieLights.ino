@@ -31,6 +31,7 @@ uint8_t debounce = 0;
 uint16_t running_cnt = 0;
 uint32_t base_color;
 uint32_t sec_color;
+uint8_t brightness;
 
 // Button timing variables
 unsigned long press_start = 0;
@@ -125,7 +126,15 @@ button:active{background:#1a7ab0}
 </div>
 </div>
 
-<button onclick="s()">Save Colors</button>
+<div class="section">
+<h2>Brightness</h2>
+<div class="slider">
+<label>Level: <input type="number" class="val" id="brv" min="0" max="255" value="255" onchange="v('br',this.value)"></label>
+<input type="range" class="w" id="br" min="0" max="255" value="255" oninput="document.getElementById('brv').value=this.value">
+</div>
+</div>
+
+<button onclick="s()">Save Settings</button>
 
 <script>
 function u(n){
@@ -155,7 +164,8 @@ let r2=document.getElementById('r2').value;
 let g2=document.getElementById('g2').value;
 let b2=document.getElementById('b2').value;
 let w2=document.getElementById('w2').value;
-let body='r1='+r1+'&g1='+g1+'&b1='+b1+'&w1='+w1+'&r2='+r2+'&g2='+g2+'&b2='+b2+'&w2='+w2;
+let br=document.getElementById('br').value;
+let body='r1='+r1+'&g1='+g1+'&b1='+b1+'&w1='+w1+'&r2='+r2+'&g2='+g2+'&b2='+b2+'&w2='+w2+'&br='+br;
 fetch('/setColors',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
 .then(r=>r.text()).then(t=>alert(t));
 }
@@ -174,6 +184,8 @@ void setup()
   // Load saved colors from preferences
   base_color = preferences.getUInt("base", WHITE);
   sec_color = preferences.getUInt("sec", BLUE);
+  brightness = preferences.getUChar("bright", 255);
+  NeoPixel.setBrightness(brightness);
 
   // Setup server routes (but don't start yet)
   setupServerRoutes();
@@ -193,7 +205,8 @@ void setupServerRoutes()
     if (request->hasParam("r1", true) && request->hasParam("g1", true) && 
         request->hasParam("b1", true) && request->hasParam("w1", true) &&
         request->hasParam("r2", true) && request->hasParam("g2", true) && 
-        request->hasParam("b2", true) && request->hasParam("w2", true)) {
+        request->hasParam("b2", true) && request->hasParam("w2", true) &&
+        request->hasParam("br", true)) {
       
       // Get base color values
       uint8_t r1 = request->getParam("r1", true)->value().toInt();
@@ -207,13 +220,18 @@ void setupServerRoutes()
       uint8_t b2 = request->getParam("b2", true)->value().toInt();
       uint8_t w2 = request->getParam("w2", true)->value().toInt();
       
+      // Get brightness
+      brightness = request->getParam("br", true)->value().toInt();
+      
       // Update colors using NeoPixel.Color() - note: Color(r,g,b,w)
       base_color = NeoPixel.Color(r1, g1, b1, w1);
       sec_color = NeoPixel.Color(r2, g2, b2, w2);
+      NeoPixel.setBrightness(brightness);
       
       // Save to preferences for persistence
       preferences.putUInt("base", base_color);
       preferences.putUInt("sec", sec_color);
+      preferences.putUChar("bright", brightness);
       
       request->send(200, "text/plain", "Colors saved successfully!");
     } else {
@@ -387,8 +405,11 @@ uint32_t rgbw_lin_interp(uint32_t c1, uint32_t c2, uint32_t step, uint32_t num_s
   new_g = (uint16_t)((c1 & 0xff00) >> 8) + (dif_g * step)/num_steps;
   new_b = (uint16_t)(c1 & 0xff) + (dif_b * step)/num_steps;
 
-  // repack to new color
-  uint32_t new_color = 0x0 | new_w << 24 | new_r << 16 | new_g << 8 | new_b;
+  // repack to new color with gamma correction for perceptually smooth transitions
+  uint32_t new_color = ((uint32_t)NeoPixel.gamma8(new_w) << 24) |
+                       ((uint32_t)NeoPixel.gamma8(new_r) << 16) |
+                       ((uint32_t)NeoPixel.gamma8(new_g) << 8) |
+                       NeoPixel.gamma8(new_b);
 
   return new_color;
 }
