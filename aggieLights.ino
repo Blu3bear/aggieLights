@@ -2,6 +2,7 @@
 #include <math.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <DNSServer.h>
 #include <ESPAsyncWebServer.h>
 
 #define BTN_PIN 27
@@ -19,6 +20,7 @@
 Adafruit_NeoPixel NeoPixel(NUM_PIXELS, PIN_NEO_PIXEL, NEO_GRBW + NEO_KHZ800);
 Preferences preferences;
 AsyncWebServer server(80);
+DNSServer dnsServer;
 
 // WiFi credentials
 const char *ssid = "Aggie_Light";
@@ -211,6 +213,20 @@ void setupServerRoutes()
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
             { request->send_P(200, "text/html", index_html); });
 
+  // Captive portal detection endpoints - redirect to main page
+  server.on("/generate_204", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->redirect("/"); });  // Android
+  server.on("/hotspot-detect.html", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->redirect("/"); });  // Apple
+  server.on("/canonical.html", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->redirect("/"); });  // Firefox
+  server.on("/success.txt", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->redirect("/"); });  // Firefox
+  server.on("/ncsi.txt", HTTP_GET, [](AsyncWebServerRequest *request)
+            { request->redirect("/"); });  // Windows
+  server.onNotFound([](AsyncWebServerRequest *request)
+            { request->redirect("/"); });  // Catch-all
+
   // Handle color POST request
   server.on("/setColors", HTTP_POST, [](AsyncWebServerRequest *request)
             {
@@ -258,12 +274,18 @@ void startServer()
   // Start open AP (no password)
   WiFi.softAP(ssid);
 
+  // Start DNS server - redirect all domains to our IP for captive portal
+  dnsServer.start(53, "*", WiFi.softAPIP());
+
   // Start web server
   server.begin();
 }
 
 void stopServer()
 {
+  // Stop DNS server
+  dnsServer.stop();
+
   // Stop web server
   server.end();
 
@@ -313,6 +335,12 @@ void loop()
     break;
   }
   NeoPixel.show();
+
+  // Process DNS requests for captive portal
+  if (web_server_enabled)
+  {
+    dnsServer.processNextRequest();
+  }
 
   // Update animation counter based on speed (non-blocking)
   // speed=1 -> ~510ms per step, speed=255 -> ~2ms per step
