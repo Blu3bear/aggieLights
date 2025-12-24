@@ -196,7 +196,7 @@ void setup()
   base_color = preferences.getUInt("base", WHITE);
   sec_color = preferences.getUInt("sec", BLUE);
   brightness = preferences.getUChar("bright", 255);
-  speed = preferences.getUChar("speed",127);
+  speed = preferences.getUChar("speed", 240);
   NeoPixel.setBrightness(brightness);
 
   // Setup server routes (but don't start yet)
@@ -317,7 +317,16 @@ void loop()
   // Update animation counter based on speed (non-blocking)
   // speed=1 -> ~510ms per step, speed=255 -> ~2ms per step
   unsigned long step_interval = (255 - speed) * 2;
-  if (millis() - last_step_time >= step_interval)
+  if (state != ALTERNATING)
+  {
+    running_cnt++;
+    // don't let running_cnt overflow
+    if (running_cnt == 0xffff)
+    {
+      running_cnt = 0;
+    }
+  }
+  else if (millis() - last_step_time >= step_interval)
   {
     last_step_time = millis();
     running_cnt++;
