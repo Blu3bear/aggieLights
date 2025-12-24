@@ -141,8 +141,8 @@ button:active{background:#1a7ab0}
 <div class="section">
 <h2>Animation Speed</h2>
 <div class="slider">
-<label>Speed: <input type="number" class="val" id="spv" min="0" max="255" value="127" onchange="document.getElementById('sp').value=this.value"></label>
-<input type="range" class="g" id="sp" min="1" max="255" value="127" oninput="document.getElementById('spv').value=this.value">
+<label>Speed: <input type="number" class="val" id="spv" min="0" max="255" value="240" onchange="document.getElementById('sp').value=this.value"></label>
+<input type="range" class="g" id="sp" min="0" max="255" value="240" oninput="document.getElementById('spv').value=this.value">
 </div>
 </div>
 
@@ -327,7 +327,7 @@ void loop()
     break;
   case RAINBOW:
     // Fill with rainbow
-    NeoPixel.rainbow(running_cnt);
+    NeoPixel.rainbow(running_cnt*10, 2);
     break;
   default:
     // fill with red if something went wrong.
