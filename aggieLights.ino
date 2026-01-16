@@ -17,7 +17,7 @@
 #define CUSTOM 6         // The state value corresponding to a custom color map(WIP)
 
 // Library objects
-Adafruit_NeoPixel NeoPixel(NUM_PIXELS, PIN_NEO_PIXEL, NEO_GRBW + NEO_KHZ800);
+Adafruit_NeoPixel NeoPixel(NUM_PIXELS, PIN_NEO_PIXEL, NEO_GRB + NEO_KHZ800);
 Preferences preferences;
 AsyncWebServer server(80);
 DNSServer dnsServer;
@@ -25,8 +25,8 @@ DNSServer dnsServer;
 // WiFi credentials
 const char *ssid = "Aggie_Light";
 
-uint32_t BLUE = NeoPixel.Color(1, 173, 216, 0);
-uint32_t WHITE = NeoPixel.Color(0, 0, 0, 255);
+uint32_t BLUE = NeoPixel.Color(1, 173, 216);
+uint32_t WHITE = NeoPixel.Color(255, 255, 255);
 
 uint8_t state = 0;
 uint8_t debounce = 0;
@@ -45,7 +45,7 @@ const unsigned long LONG_PRESS_MS = 3000;
 const uint8_t DEBOUNCE_THRESHOLD = 50;
 
 // Function prototypes
-uint32_t rgbw_lin_interp(uint32_t c1, uint32_t c2, uint32_t step, uint32_t num_steps = 255);
+uint32_t rgb_lin_interp(uint32_t c1, uint32_t c2, uint32_t step, uint32_t num_steps = 255);
 void setupServerRoutes();
 void startServer();
 void stopServer();
@@ -73,8 +73,8 @@ input[type=range]::-moz-range-thumb{width:24px;height:24px;border-radius:50%;bor
 .g::-moz-range-thumb{background:#0f0}
 .b::-webkit-slider-thumb{background:#00f}
 .b::-moz-range-thumb{background:#00f}
-.w::-webkit-slider-thumb{background:#fff}
-.w::-moz-range-thumb{background:#fff}
+.br::-webkit-slider-thumb{background:#fff}
+.br::-moz-range-thumb{background:#fff}
 label{display:flex;justify-content:space-between;margin-bottom:5px;font-weight:bold}
 .val{background:#333;border:1px solid #555;border-radius:4px;padding:2px 6px;color:#fff;width:35px;text-align:center}
 input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
@@ -92,20 +92,16 @@ button:active{background:#1a7ab0}
 <h2>Base Color</h2>
 <div class="preview" id="preview1"></div>
 <div class="slider">
-<label>R: <input type="number" class="val" id="r1v" min="0" max="255" value="0" onchange="v('r1',this.value)"></label>
-<input type="range" class="r" id="r1" min="0" max="255" value="0" oninput="u(1)">
+<label>R: <input type="number" class="val" id="r1v" min="0" max="255" value="255" onchange="v('r1',this.value)"></label>
+<input type="range" class="r" id="r1" min="0" max="255" value="255" oninput="u(1)">
 </div>
 <div class="slider">
-<label>G: <input type="number" class="val" id="g1v" min="0" max="255" value="0" onchange="v('g1',this.value)"></label>
-<input type="range" class="g" id="g1" min="0" max="255" value="0" oninput="u(1)">
+<label>G: <input type="number" class="val" id="g1v" min="0" max="255" value="255" onchange="v('g1',this.value)"></label>
+<input type="range" class="g" id="g1" min="0" max="255" value="255" oninput="u(1)">
 </div>
 <div class="slider">
-<label>B: <input type="number" class="val" id="b1v" min="0" max="255" value="0" onchange="v('b1',this.value)"></label>
-<input type="range" class="b" id="b1" min="0" max="255" value="0" oninput="u(1)">
-</div>
-<div class="slider">
-<label>W: <input type="number" class="val" id="w1v" min="0" max="255" value="255" onchange="v('w1',this.value)"></label>
-<input type="range" class="w" id="w1" min="0" max="255" value="255" oninput="u(1)">
+<label>B: <input type="number" class="val" id="b1v" min="0" max="255" value="255" onchange="v('b1',this.value)"></label>
+<input type="range" class="b" id="b1" min="0" max="255" value="255" oninput="u(1)">
 </div>
 </div>
 
@@ -124,17 +120,13 @@ button:active{background:#1a7ab0}
 <label>B: <input type="number" class="val" id="b2v" min="0" max="255" value="216" onchange="v('b2',this.value)"></label>
 <input type="range" class="b" id="b2" min="0" max="255" value="216" oninput="u(2)">
 </div>
-<div class="slider">
-<label>W: <input type="number" class="val" id="w2v" min="0" max="255" value="0" onchange="v('w2',this.value)"></label>
-<input type="range" class="w" id="w2" min="0" max="255" value="0" oninput="u(2)">
-</div>
 </div>
 
 <div class="section">
 <h2>Brightness</h2>
 <div class="slider">
-<label>Level: <input type="number" class="val" id="brv" min="0" max="255" value="255" onchange="v('br',this.value)"></label>
-<input type="range" class="w" id="br" min="0" max="255" value="255" oninput="document.getElementById('brv').value=this.value">
+<label>Level: <input type="number" class="val" id="brv" min="0" max="255" value="255" onchange="document.getElementById('br').value=this.value"></label>
+<input type="range" class="br" id="br" min="0" max="255" value="255" oninput="document.getElementById('brv').value=this.value">
 </div>
 </div>
 
@@ -153,15 +145,10 @@ function u(n){
 let r=document.getElementById('r'+n).value;
 let g=document.getElementById('g'+n).value;
 let b=document.getElementById('b'+n).value;
-let w=document.getElementById('w'+n).value;
 document.getElementById('r'+n+'v').value=r;
 document.getElementById('g'+n+'v').value=g;
 document.getElementById('b'+n+'v').value=b;
-document.getElementById('w'+n+'v').value=w;
-let wr=Math.min(255,parseInt(r)+parseInt(w));
-let wg=Math.min(255,parseInt(g)+parseInt(w));
-let wb=Math.min(255,parseInt(b)+parseInt(w));
-document.getElementById('preview'+n).style.background='rgb('+wr+','+wg+','+wb+')';
+document.getElementById('preview'+n).style.background='rgb('+r+','+g+','+b+')';
 }
 function v(id,val){
 document.getElementById(id).value=val;
@@ -171,14 +158,12 @@ function s(){
 let r1=document.getElementById('r1').value;
 let g1=document.getElementById('g1').value;
 let b1=document.getElementById('b1').value;
-let w1=document.getElementById('w1').value;
 let r2=document.getElementById('r2').value;
 let g2=document.getElementById('g2').value;
 let b2=document.getElementById('b2').value;
-let w2=document.getElementById('w2').value;
 let br=document.getElementById('br').value;
 let sp=document.getElementById('sp').value;
-let body='r1='+r1+'&g1='+g1+'&b1='+b1+'&w1='+w1+'&r2='+r2+'&g2='+g2+'&b2='+b2+'&w2='+w2+'&br='+br+'&sp='+sp;
+let body='r1='+r1+'&g1='+g1+'&b1='+b1+'&r2='+r2+'&g2='+g2+'&b2='+b2+'&br='+br+'&sp='+sp;
 fetch('/setColors',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})
 .then(r=>r.text()).then(t=>alert(t));
 }
@@ -231,30 +216,28 @@ void setupServerRoutes()
   server.on("/setColors", HTTP_POST, [](AsyncWebServerRequest *request)
             {
     if (request->hasParam("r1", true) && request->hasParam("g1", true) && 
-        request->hasParam("b1", true) && request->hasParam("w1", true) &&
+        request->hasParam("b1", true) &&
         request->hasParam("r2", true) && request->hasParam("g2", true) && 
-        request->hasParam("b2", true) && request->hasParam("w2", true) &&
+        request->hasParam("b2", true) &&
         request->hasParam("br", true) && request->hasParam("sp", true)) {
       
       // Get base color values
       uint8_t r1 = request->getParam("r1", true)->value().toInt();
       uint8_t g1 = request->getParam("g1", true)->value().toInt();
       uint8_t b1 = request->getParam("b1", true)->value().toInt();
-      uint8_t w1 = request->getParam("w1", true)->value().toInt();
       
       // Get secondary color values
       uint8_t r2 = request->getParam("r2", true)->value().toInt();
       uint8_t g2 = request->getParam("g2", true)->value().toInt();
       uint8_t b2 = request->getParam("b2", true)->value().toInt();
-      uint8_t w2 = request->getParam("w2", true)->value().toInt();
       
       // Get brightness and speed
       brightness = request->getParam("br", true)->value().toInt();
       speed = request->getParam("sp", true)->value().toInt();
       
-      // Update colors using NeoPixel.Color() - note: Color(r,g,b,w)
-      base_color = NeoPixel.Color(r1, g1, b1, w1);
-      sec_color = NeoPixel.Color(r2, g2, b2, w2);
+      // Update colors using NeoPixel.Color() - note: Color(r,g,b)
+      base_color = NeoPixel.Color(r1, g1, b1);
+      sec_color = NeoPixel.Color(r2, g2, b2);
       NeoPixel.setBrightness(brightness);
       
       // Save to preferences for persistence
@@ -316,7 +299,7 @@ void loop()
   case ALTERNATING:
     // Use the sine8 function to give a smooth transition between two colors
     steps = NeoPixel.sine8(running_cnt % 256);
-    color = rgbw_lin_interp(base_color, sec_color, steps);
+    color = rgb_lin_interp(base_color, sec_color, steps);
     NeoPixel.fill(color);
     break;
   case RUNNING:
@@ -392,7 +375,7 @@ void loop()
         // Flash green to indicate server started
         for (int i = 0; i < 3; i++)
         {
-          NeoPixel.fill(NeoPixel.Color(0, 255, 0, 0)); // Green
+          NeoPixel.fill(NeoPixel.Color(0, 255, 0)); // Green
           NeoPixel.show();
           delay(200);
           NeoPixel.clear();
@@ -406,7 +389,7 @@ void loop()
         // Flash red to indicate server stopped
         for (int i = 0; i < 3; i++)
         {
-          NeoPixel.fill(NeoPixel.Color(255, 0, 0, 0)); // Red
+          NeoPixel.fill(NeoPixel.Color(255, 0, 0)); // Red
           NeoPixel.show();
           delay(200);
           NeoPixel.clear();
@@ -432,40 +415,36 @@ void loop()
   }
 }
 
-uint32_t rgbw_lin_interp(uint32_t c1, uint32_t c2, uint32_t step, uint32_t num_steps)
+uint32_t rgb_lin_interp(uint32_t c1, uint32_t c2, uint32_t step, uint32_t num_steps)
 {
-  // linear interpolation for rgbw values
+  // linear interpolation for rgb values
   // arguments:
-  //    c1 - a packed color code in the form 0xgrbw
+  //    c1 - a packed color code in the form 0x00rrggbb
   //    c2 - a second packed color code
   //    step - the current step between c1 and c2
   //    steps - the number of steps between c1 and c2(default 255)
   // returns:
   //    uint32_t representing the current value that is %step% steps from c1 to c2
 
-  int16_t dif_r, dif_g, dif_b, dif_w;
-  uint8_t new_r, new_g, new_b, new_w;
-  // most significant byte is white
-  dif_w = ((c2 & 0xff000000) >> 24) - ((c1 & 0xff000000) >> 24);
+  int16_t dif_r, dif_g, dif_b;
+  uint8_t new_r, new_g, new_b;
 
-  // then red
+  // red is in bits 16-23
   dif_r = ((c2 & 0xff0000) >> 16) - ((c1 & 0xff0000) >> 16);
 
-  // then green
+  // green is in bits 8-15
   dif_g = ((c2 & 0xff00) >> 8) - ((c1 & 0xff00) >> 8);
 
-  // then blue
+  // blue is in bits 0-7
   dif_b = (c2 & 0xff) - (c1 & 0xff);
 
   // get each new color value
-  new_w = (uint16_t)((c1 & 0xff000000) >> 24) + (dif_w * step) / num_steps;
   new_r = (uint16_t)((c1 & 0xff0000) >> 16) + (dif_r * step) / num_steps;
   new_g = (uint16_t)((c1 & 0xff00) >> 8) + (dif_g * step) / num_steps;
   new_b = (uint16_t)(c1 & 0xff) + (dif_b * step) / num_steps;
 
   // repack to new color with gamma correction for perceptually smooth transitions
-  uint32_t new_color = ((uint32_t)NeoPixel.gamma8(new_w) << 24) |
-                       ((uint32_t)NeoPixel.gamma8(new_r) << 16) |
+  uint32_t new_color = ((uint32_t)NeoPixel.gamma8(new_r) << 16) |
                        ((uint32_t)NeoPixel.gamma8(new_g) << 8) |
                        NeoPixel.gamma8(new_b);
 
